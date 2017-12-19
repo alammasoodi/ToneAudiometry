@@ -8,6 +8,7 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.media.MediaPlayer;
 import android.os.Bundle;
+import android.os.CountDownTimer;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,6 +23,7 @@ import java.io.IOException;
 
 public class ToneAudiometryFragment extends Fragment {
     View v;
+    CountDownTimer mCountDownTimer;
     Button leftEarButton,rightEarButton;
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -29,24 +31,25 @@ public class ToneAudiometryFragment extends Fragment {
         AudioManager am = (AudioManager)getActivity().getSystemService(Context.AUDIO_SERVICE);
 
         if(am.isWiredHeadsetOn()) {
-            MediaPlayer AudioObj = new MediaPlayer();
-            AudioObj.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+            final float[] increaseVolume = {0f};
+
+            final AudioTrack tone = generateTone(500, 10000);
+            tone.setStereoVolume(0, increaseVolume[0]);
+            mCountDownTimer = new CountDownTimer(10000, 1000) {
                 @Override
-                public void onPrepared(final MediaPlayer mediaPlayer) {
-                    AudioTrack tone = generateTone(200, 5000);
-                    tone.play();
-//                    mediaPlayer.setVolume(0, 0.1f);
-//                    mediaPlayer.start();
+                public void onTick(long millisUntilFinished) {
+                    tone.setStereoVolume(0, increaseVolume[0]);
+                    increaseVolume[0] = increaseVolume[0] + 0.1f;
+                }
+
+                @Override
+                public void onFinish() {
 
                 }
-            });
+            };
+            tone.play();
+            mCountDownTimer.start();
 
-            AudioObj.setAudioStreamType(AudioManager.STREAM_MUSIC);
-            try {
-                AssetFileDescriptor afd = getActivity().getAssets().openFd("beep-11.mp3");
-                AudioObj.setDataSource(afd.getFileDescriptor());
-            }catch (IOException e){}
-            AudioObj.prepareAsync();
         } else{
             Toast.makeText(getActivity(),"Plz insert headphone",Toast.LENGTH_SHORT).show();
         }

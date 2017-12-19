@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">ToneAudiometryTest</string>
+    <string name="tone_label">Every time you start hearing a sound, tap the left or right button to indicate which ear you hear the sound in.</string>
 </resources>

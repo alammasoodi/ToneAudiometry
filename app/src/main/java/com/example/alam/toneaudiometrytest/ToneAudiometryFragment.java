@@ -2,20 +2,15 @@ package com.example.alam.toneaudiometrytest;
 
 import android.app.Fragment;
 import android.content.Context;
-import android.content.res.AssetFileDescriptor;
 import android.media.AudioFormat;
 import android.media.AudioManager;
 import android.media.AudioTrack;
-import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.Toast;
-
-import java.io.IOException;
 
 /**
  * Created by alam on 18/12/17.
@@ -23,19 +18,24 @@ import java.io.IOException;
 
 public class ToneAudiometryFragment extends Fragment {
     View v;
-    CountDownTimer mainCounter;
     Button leftEarButton,rightEarButton;
     int soundHertz = 250;
-    int leftEar = 0;
+    int rightTone = 0,savedTone;
+    AudioTrack tone;
+    CountDownTimer mCountDownTimer;
+    long milliLeft;
+    float savedVolume[];
+    float increaseVolume[];
+    boolean isPaused = false;
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         v = inflater.inflate(R.layout.fragment_audiometry, container, false);
         AudioManager am = (AudioManager)getActivity().getSystemService(Context.AUDIO_SERVICE);
 
         //if(am.isWiredHeadsetOn()) {
-       // for(int i=0 ;i<10 ;i++){
-            startPlayingTones(soundHertz,leftEar);
-        //}
+
+            startPlayingTones(soundHertz, rightTone);
 //            mainCounter = new CountDownTimer(60000,1000) {
 //                @Override
 //                public void onTick(long l) {
@@ -58,10 +58,10 @@ public class ToneAudiometryFragment extends Fragment {
     public void handleHeadphonesState(Context context){
 
     }
-    public void startPlayingTones(int hertz, final int ear){
-        final float[] increaseVolume = {0f};
-        final AudioTrack tone = generateTone(hertz, 5000);
-        if(ear == 0) {
+    public void startPlayingTones(int hertz, final int rightEarTone){
+        increaseVolume = new float[]{0f};
+        tone = generateTone(hertz, 6000);
+        if(rightEarTone == 0) {
             tone.setStereoVolume(increaseVolume[0], 0);
         }
         else
@@ -69,12 +69,21 @@ public class ToneAudiometryFragment extends Fragment {
             tone.setStereoVolume(0, increaseVolume[0]);
 
         }
-        tone.play();
+        try {
+            tone.play();
+        }catch (IllegalStateException ie){
+            ie.printStackTrace();
+        }
+        timerStart(6000,rightEarTone,increaseVolume);
 
-        CountDownTimer mCountDownTimer = new CountDownTimer(5000, 1000) {
+       }
+
+       public void timerStart(long timeLengthMilli, final int rightEarTone, final float increaseVolume[]) {
+        mCountDownTimer = new CountDownTimer(timeLengthMilli, 1000) {
             @Override
             public void onTick(long millisUntilFinished) {
-                if(ear == 0) {
+                milliLeft = millisUntilFinished;
+                if(rightEarTone == 0) {
                     tone.setStereoVolume(increaseVolume[0], 0);
                 }
                 else
@@ -82,7 +91,7 @@ public class ToneAudiometryFragment extends Fragment {
                     tone.setStereoVolume(0, increaseVolume[0]);
 
                 }
-                increaseVolume[0] = increaseVolume[0] + 0.1f;
+                increaseVolume[0] = increaseVolume[0] + 0.002f;
             }
 
             @Override
@@ -90,22 +99,26 @@ public class ToneAudiometryFragment extends Fragment {
 //                tone.flush();
 //                tone.stop();
 //                tone.release();
-                if(ear == 0){
-                    leftEar = 1;
+                if(rightEarTone == 0){
+                    rightTone = 1;
+                    startPlayingTones(soundHertz, rightTone);
                 }
                 else{
-                    leftEar = 0;
-                    if(soundHertz<8000) {
+                    rightTone = 0;
+
+                    if(soundHertz<4000) {
                         soundHertz = soundHertz *2;
+                        startPlayingTones(soundHertz, rightTone);
+
                     }
                 }
-                startPlayingTones(soundHertz,leftEar);
 
 
 
             }
         };
         mCountDownTimer.start();
+
     }
     private AudioTrack generateTone(double freqHz, int durationMs)
     {
@@ -121,5 +134,27 @@ public class ToneAudiometryFragment extends Fragment {
                 count * (Short.SIZE / 8), AudioTrack.MODE_STATIC);
         track.write(samples, 0, count);
         return track;
+    }
+
+    @Override
+    public void onPause(){
+        super.onPause();
+        mCountDownTimer.cancel();
+        tone.pause();
+        savedTone = rightTone;
+        isPaused = true;
+
+    }
+    @Override
+    public void onResume() {
+        super.onResume();
+        if(isPaused) {
+            if(soundHertz<4000) {
+
+                tone.play();
+                timerStart(milliLeft, savedTone, increaseVolume);
+
+            }
+        }
     }
     }

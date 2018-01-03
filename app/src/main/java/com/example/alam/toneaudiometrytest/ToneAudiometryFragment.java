@@ -23,41 +23,89 @@ import java.io.IOException;
 
 public class ToneAudiometryFragment extends Fragment {
     View v;
-    CountDownTimer mCountDownTimer;
+    CountDownTimer mainCounter;
     Button leftEarButton,rightEarButton;
+    int soundHertz = 250;
+    int leftEar = 0;
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         v = inflater.inflate(R.layout.fragment_audiometry, container, false);
         AudioManager am = (AudioManager)getActivity().getSystemService(Context.AUDIO_SERVICE);
 
-        if(am.isWiredHeadsetOn()) {
-            final float[] increaseVolume = {0f};
+        //if(am.isWiredHeadsetOn()) {
+       // for(int i=0 ;i<10 ;i++){
+            startPlayingTones(soundHertz,leftEar);
+        //}
+//            mainCounter = new CountDownTimer(60000,1000) {
+//                @Override
+//                public void onTick(long l) {
+//                }
+//
+//                @Override
+//                public void onFinish() {
+//
+//                }
+//            }.start();
 
-            final AudioTrack tone = generateTone(500, 10000);
-            tone.setStereoVolume(0, increaseVolume[0]);
-            mCountDownTimer = new CountDownTimer(10000, 1000) {
-                @Override
-                public void onTick(long millisUntilFinished) {
-                    tone.setStereoVolume(0, increaseVolume[0]);
-                    increaseVolume[0] = increaseVolume[0] + 0.1f;
-                }
 
-                @Override
-                public void onFinish() {
 
-                }
-            };
-            tone.play();
-            mCountDownTimer.start();
-
-        } else{
-            Toast.makeText(getActivity(),"Plz insert headphone",Toast.LENGTH_SHORT).show();
-        }
+       //} else{
+//            Toast.makeText(getActivity(),"Plz insert headphone",Toast.LENGTH_SHORT).show();
+//        }
 
         return v;
     }
     public void handleHeadphonesState(Context context){
 
+    }
+    public void startPlayingTones(int hertz, final int ear){
+        final float[] increaseVolume = {0f};
+        final AudioTrack tone = generateTone(hertz, 5000);
+        if(ear == 0) {
+            tone.setStereoVolume(increaseVolume[0], 0);
+        }
+        else
+        {
+            tone.setStereoVolume(0, increaseVolume[0]);
+
+        }
+        tone.play();
+
+        CountDownTimer mCountDownTimer = new CountDownTimer(5000, 1000) {
+            @Override
+            public void onTick(long millisUntilFinished) {
+                if(ear == 0) {
+                    tone.setStereoVolume(increaseVolume[0], 0);
+                }
+                else
+                {
+                    tone.setStereoVolume(0, increaseVolume[0]);
+
+                }
+                increaseVolume[0] = increaseVolume[0] + 0.1f;
+            }
+
+            @Override
+            public void onFinish() {
+//                tone.flush();
+//                tone.stop();
+//                tone.release();
+                if(ear == 0){
+                    leftEar = 1;
+                }
+                else{
+                    leftEar = 0;
+                    if(soundHertz<8000) {
+                        soundHertz = soundHertz *2;
+                    }
+                }
+                startPlayingTones(soundHertz,leftEar);
+
+
+
+            }
+        };
+        mCountDownTimer.start();
     }
     private AudioTrack generateTone(double freqHz, int durationMs)
     {

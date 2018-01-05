@@ -1,6 +1,8 @@
 package com.example.alam.toneaudiometrytest;
 
+import android.animation.ObjectAnimator;
 import android.app.Fragment;
+import android.app.UiAutomation;
 import android.content.Context;
 import android.media.AudioFormat;
 import android.media.AudioManager;
@@ -10,29 +12,47 @@ import android.os.CountDownTimer;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.LinearInterpolator;
 import android.widget.Button;
+import android.widget.ProgressBar;
+import android.widget.Toast;
 
 /**
  * Created by alam on 18/12/17.
  */
 
-public class ToneAudiometryFragment extends Fragment {
+public class ToneAudiometryFragment extends Fragment implements View.OnClickListener {
     View v;
     Button leftEarButton,rightEarButton;
     int soundHertz = 250;
     int rightTone = 0,savedTone;
     AudioTrack tone;
     CountDownTimer mCountDownTimer;
+    ObjectAnimator progressAnimator;
     long milliLeft;
     float savedVolume[];
     float increaseVolume[];
+    ProgressBar progressBar;
     boolean isPaused = false;
+    int leftCounts = 0,rightCounts = 0;
+    boolean isButtonClicked = false;
+
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         v = inflater.inflate(R.layout.fragment_audiometry, container, false);
         AudioManager am = (AudioManager)getActivity().getSystemService(Context.AUDIO_SERVICE);
-
+        leftEarButton = (Button) v.findViewById(R.id.left_ear_button);
+        rightEarButton = (Button) v.findViewById(R.id.right_ear_button);
+        leftEarButton.setOnClickListener(this);
+        rightEarButton.setOnClickListener(this);
+        progressBar = (ProgressBar)v.findViewById(R.id.progressbar);
+        progressBar.getProgressDrawable().setColorFilter(
+                getResources().getColor(R.color.buttonColor), android.graphics.PorterDuff.Mode.SRC_IN);
+        progressAnimator = ObjectAnimator.ofInt(progressBar, "progress", progressBar.getProgress(), 500);
+        progressAnimator.setDuration(60000);
+        progressAnimator.setInterpolator(new LinearInterpolator());
+        progressAnimator.start();
         //if(am.isWiredHeadsetOn()) {
 
             startPlayingTones(soundHertz, rightTone);
@@ -63,10 +83,12 @@ public class ToneAudiometryFragment extends Fragment {
         tone = generateTone(hertz, 6000);
         if(rightEarTone == 0) {
             tone.setStereoVolume(increaseVolume[0], 0);
+            rightEarButton.setEnabled(false);
         }
         else
         {
             tone.setStereoVolume(0, increaseVolume[0]);
+            leftEarButton.setEnabled(false);
 
         }
         try {
@@ -78,17 +100,22 @@ public class ToneAudiometryFragment extends Fragment {
 
        }
 
-       public void timerStart(long timeLengthMilli, final int rightEarTone, final float increaseVolume[]) {
+       public void timerStart(final long timeLengthMilli, final int rightEarTone, final float increaseVolume[]) {
         mCountDownTimer = new CountDownTimer(timeLengthMilli, 1000) {
             @Override
             public void onTick(long millisUntilFinished) {
                 milliLeft = millisUntilFinished;
                 if(rightEarTone == 0) {
                     tone.setStereoVolume(increaseVolume[0], 0);
+                    rightEarButton.setEnabled(false);
+
+
                 }
                 else
                 {
                     tone.setStereoVolume(0, increaseVolume[0]);
+                    leftEarButton.setEnabled(false);
+
 
                 }
                 increaseVolume[0] = increaseVolume[0] + 0.002f;
@@ -96,21 +123,20 @@ public class ToneAudiometryFragment extends Fragment {
 
             @Override
             public void onFinish() {
-//                tone.flush();
-//                tone.stop();
-//                tone.release();
                 if(rightEarTone == 0){
                     rightTone = 1;
                     startPlayingTones(soundHertz, rightTone);
+                    rightEarButton.setEnabled(true);
                 }
                 else{
                     rightTone = 0;
-
+                    leftEarButton.setEnabled(true);
                     if(soundHertz<4000) {
                         soundHertz = soundHertz *2;
                         startPlayingTones(soundHertz, rightTone);
 
                     }
+
                 }
 
 
@@ -140,7 +166,12 @@ public class ToneAudiometryFragment extends Fragment {
     public void onPause(){
         super.onPause();
         mCountDownTimer.cancel();
-        tone.pause();
+        try {
+            tone.pause();
+        }
+        catch (IllegalStateException ie){
+            ie.printStackTrace();
+        }
         savedTone = rightTone;
         isPaused = true;
 
@@ -150,11 +181,48 @@ public class ToneAudiometryFragment extends Fragment {
         super.onResume();
         if(isPaused) {
             if(soundHertz<4000) {
-
-                tone.play();
+                try {
+                    tone.play();
+                }
+                catch (IllegalStateException ie){
+                    ie.printStackTrace();
+                }
                 timerStart(milliLeft, savedTone, increaseVolume);
+
 
             }
         }
     }
+
+    @Override
+    public void onClick(View view) {
+        int id = view.getId();
+        switch (id){
+            case R.id.left_ear_button:
+                playNext(0);
+                rightEarButton.setOnClickListener(this);
+                Toast.makeText(getActivity(),"you listened to the sound of "+soundHertz+" Hz from left ear",Toast.LENGTH_SHORT).show();
+                break;
+            case R.id.right_ear_button:
+                playNext(1);
+                leftEarButton.setOnClickListener(this);
+                Toast.makeText(getActivity(),"you listened to the sound of "+soundHertz+" Hz from right ear",Toast.LENGTH_SHORT).show();
+
+                break;
+        }
     }
+
+    public void playNext(int nextEar){
+        //progressBar.setProgress(progressBar.getProgress()+25);
+        mCountDownTimer.cancel();
+        try {
+            tone.stop();
+            tone.release();
+        }catch (IllegalStateException ie){
+            ie.printStackTrace();
+        }
+        float[] resetVolume = new float[]{0f};
+        timerStart(500,nextEar,resetVolume);
+
+    }
+}
